@@ -32,6 +32,7 @@ import utils
 import models.convnext
 import models.convnext_isotropic
 
+
 def str2bool(v):
     """
     Converts string to bool type; enables command line 
@@ -46,8 +47,10 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
 def get_args_parser():
-    parser = argparse.ArgumentParser('ConvNeXt training and evaluation script for image classification', add_help=False)
+    parser = argparse.ArgumentParser(
+        'ConvNeXt training and evaluation script for image classification', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Per GPU batch size')
     parser.add_argument('--epochs', default=300, type=int)
@@ -63,12 +66,16 @@ def get_args_parser():
                         help='image input size')
     parser.add_argument('--layer_scale_init_value', default=1e-6, type=float,
                         help="Layer scale initial values")
+    parser.add_argument('--bitstring', type=str, default=None)
 
     # EMA related parameters
     parser.add_argument('--model_ema', type=str2bool, default=False)
-    parser.add_argument('--model_ema_decay', type=float, default=0.9999, help='')
-    parser.add_argument('--model_ema_force_cpu', type=str2bool, default=False, help='')
-    parser.add_argument('--model_ema_eval', type=str2bool, default=False, help='Using ema to eval during training.')
+    parser.add_argument('--model_ema_decay', type=float,
+                        default=0.9999, help='')
+    parser.add_argument('--model_ema_force_cpu',
+                        type=str2bool, default=False, help='')
+    parser.add_argument('--model_ema_eval', type=str2bool,
+                        default=False, help='Using ema to eval during training.')
 
     # Optimization parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -150,8 +157,9 @@ def get_args_parser():
                         help='dataset path for evaluation')
     parser.add_argument('--nb_classes', default=1000, type=int,
                         help='number of the classification types')
-    parser.add_argument('--imagenet_default_mean_and_std', type=str2bool, default=True)
-    parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'image_folder'],
+    parser.add_argument('--imagenet_default_mean_and_std',
+                        type=str2bool, default=True)
+    parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'image_folder', 'CALTECH'],
                         type=str, help='ImageNet dataset path')
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
@@ -188,7 +196,7 @@ def get_args_parser():
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
 
-    parser.add_argument('--use_amp', type=str2bool, default=False, 
+    parser.add_argument('--use_amp', type=str2bool, default=False,
                         help="Use PyTorch's AMP (Automatic Mixed Precision) or not")
 
     # Weights and Biases arguments
@@ -200,6 +208,7 @@ def get_args_parser():
                         help="Save model checkpoints as W&B Artifacts.")
 
     return parser
+
 
 def main(args):
     utils.init_distributed_mode(args)
@@ -229,8 +238,8 @@ def main(args):
     if args.dist_eval:
         if len(dataset_val) % num_tasks != 0:
             print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
-                    'This will slightly alter validation results as extra duplicate entries are added to achieve '
-                    'equal num of samples per-process.')
+                  'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                  'equal num of samples per-process.')
         sampler_val = torch.utils.data.DistributedSampler(
             dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)
     else:
@@ -276,13 +285,14 @@ def main(args):
             label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     model = create_model(
-        args.model, 
-        pretrained=False, 
-        num_classes=args.nb_classes, 
+        args.model,
+        pretrained=False,
+        num_classes=args.nb_classes,
         drop_path_rate=args.drop_path,
         layer_scale_init_value=args.layer_scale_init_value,
         head_init_scale=args.head_init_scale,
-        )
+        bitstring=args.bitstring
+    )
 
     if args.finetune:
         if args.finetune.startswith('https'):
@@ -305,7 +315,8 @@ def main(args):
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
-        utils.load_state_dict(model, checkpoint_model, prefix=args.model_prefix)
+        utils.load_state_dict(model, checkpoint_model,
+                              prefix=args.model_prefix)
     model.to(device)
 
     model_ema = None
@@ -319,7 +330,8 @@ def main(args):
         print("Using EMA with decay = %.8f" % args.model_ema_decay)
 
     model_without_ddp = model
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    n_parameters = sum(p.numel()
+                       for p in model.parameters() if p.requires_grad)
 
     print("Model = %s" % str(model_without_ddp))
     print('number of params:', n_parameters)
@@ -330,13 +342,16 @@ def main(args):
     print("Batch size = %d" % total_batch_size)
     print("Update frequent = %d" % args.update_freq)
     print("Number of training examples = %d" % len(dataset_train))
-    print("Number of training training per epoch = %d" % num_training_steps_per_epoch)
+    print("Number of training training per epoch = %d" %
+          num_training_steps_per_epoch)
 
     if args.layer_decay < 1.0 or args.layer_decay > 1.0:
-        num_layers = 12 # convnext layers divided into 12 parts, each with a different decayed lr value.
+        # convnext layers divided into 12 parts, each with a different decayed lr value.
+        num_layers = 12
         assert args.model in ['convnext_small', 'convnext_base', 'convnext_large', 'convnext_xlarge'], \
-             "Layer Decay impl only supports convnext_small/base/large/xlarge"
-        assigner = LayerDecayValueAssigner(list(args.layer_decay ** (num_layers + 1 - i) for i in range(num_layers + 2)))
+            "Layer Decay impl only supports convnext_small/base/large/xlarge"
+        assigner = LayerDecayValueAssigner(
+            list(args.layer_decay ** (num_layers + 1 - i) for i in range(num_layers + 2)))
     else:
         assigner = None
 
@@ -344,15 +359,16 @@ def main(args):
         print("Assigned values = %s" % str(assigner.values))
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[args.gpu], find_unused_parameters=False)
         model_without_ddp = model.module
 
     optimizer = create_optimizer(
         args, model_without_ddp, skip_list=None,
-        get_num_layer=assigner.get_layer_id if assigner is not None else None, 
+        get_num_layer=assigner.get_layer_id if assigner is not None else None,
         get_layer_scale=assigner.get_scale if assigner is not None else None)
 
-    loss_scaler = NativeScaler() # if args.use_amp is False, this won't be used
+    loss_scaler = NativeScaler()  # if args.use_amp is False, this won't be used
 
     print("Use Cosine LR scheduler")
     lr_schedule_values = utils.cosine_scheduler(
@@ -364,7 +380,8 @@ def main(args):
         args.weight_decay_end = args.weight_decay
     wd_schedule_values = utils.cosine_scheduler(
         args.weight_decay, args.weight_decay_end, args.epochs, num_training_steps_per_epoch)
-    print("Max WD = %.7f, Min WD = %.7f" % (max(wd_schedule_values), min(wd_schedule_values)))
+    print("Max WD = %.7f, Min WD = %.7f" %
+          (max(wd_schedule_values), min(wd_schedule_values)))
 
     if mixup_fn is not None:
         # smoothing is handled with mixup label transform
@@ -382,8 +399,10 @@ def main(args):
 
     if args.eval:
         print(f"Eval only mode")
-        test_stats = evaluate(data_loader_val, model, device, use_amp=args.use_amp)
-        print(f"Accuracy of the network on {len(dataset_val)} test images: {test_stats['acc1']:.5f}%")
+        test_stats = evaluate(data_loader_val, model,
+                              device, use_amp=args.use_amp)
+        print(
+            f"Accuracy of the network on {len(dataset_val)} test images: {test_stats['acc1']:.5f}%")
         return
 
     max_accuracy = 0.0
@@ -396,13 +415,15 @@ def main(args):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
         if log_writer is not None:
-            log_writer.set_step(epoch * num_training_steps_per_epoch * args.update_freq)
+            log_writer.set_step(
+                epoch * num_training_steps_per_epoch * args.update_freq)
         if wandb_logger:
             wandb_logger.set_steps()
         train_stats = train_one_epoch(
             model, criterion, data_loader_train, optimizer,
             device, epoch, loss_scaler, args.clip_grad, model_ema, mixup_fn,
-            log_writer=log_writer, wandb_logger=wandb_logger, start_steps=epoch * num_training_steps_per_epoch,
+            log_writer=log_writer, wandb_logger=wandb_logger, start_steps=epoch *
+            num_training_steps_per_epoch,
             lr_schedule_values=lr_schedule_values, wd_schedule_values=wd_schedule_values,
             num_training_steps_per_epoch=num_training_steps_per_epoch, update_freq=args.update_freq,
             use_amp=args.use_amp
@@ -413,8 +434,10 @@ def main(args):
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, model_ema=model_ema)
         if data_loader_val is not None:
-            test_stats = evaluate(data_loader_val, model, device, use_amp=args.use_amp)
-            print(f"Accuracy of the model on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+            test_stats = evaluate(data_loader_val, model,
+                                  device, use_amp=args.use_amp)
+            print(
+                f"Accuracy of the model on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
             if max_accuracy < test_stats["acc1"]:
                 max_accuracy = test_stats["acc1"]
                 if args.output_dir and args.save_ckpt:
@@ -424,9 +447,12 @@ def main(args):
             print(f'Max accuracy: {max_accuracy:.2f}%')
 
             if log_writer is not None:
-                log_writer.update(test_acc1=test_stats['acc1'], head="perf", step=epoch)
-                log_writer.update(test_acc5=test_stats['acc5'], head="perf", step=epoch)
-                log_writer.update(test_loss=test_stats['loss'], head="perf", step=epoch)
+                log_writer.update(
+                    test_acc1=test_stats['acc1'], head="perf", step=epoch)
+                log_writer.update(
+                    test_acc5=test_stats['acc5'], head="perf", step=epoch)
+                log_writer.update(
+                    test_loss=test_stats['loss'], head="perf", step=epoch)
 
             log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                          **{f'test_{k}': v for k, v in test_stats.items()},
@@ -435,8 +461,10 @@ def main(args):
 
             # repeat testing routines for EMA, if ema eval is turned on
             if args.model_ema and args.model_ema_eval:
-                test_stats_ema = evaluate(data_loader_val, model_ema.ema, device, use_amp=args.use_amp)
-                print(f"Accuracy of the model EMA on {len(dataset_val)} test images: {test_stats_ema['acc1']:.1f}%")
+                test_stats_ema = evaluate(
+                    data_loader_val, model_ema.ema, device, use_amp=args.use_amp)
+                print(
+                    f"Accuracy of the model EMA on {len(dataset_val)} test images: {test_stats_ema['acc1']:.1f}%")
                 if max_accuracy_ema < test_stats_ema["acc1"]:
                     max_accuracy_ema = test_stats_ema["acc1"]
                     if args.output_dir and args.save_ckpt:
@@ -445,8 +473,10 @@ def main(args):
                             loss_scaler=loss_scaler, epoch="best-ema", model_ema=model_ema)
                     print(f'Max EMA accuracy: {max_accuracy_ema:.2f}%')
                 if log_writer is not None:
-                    log_writer.update(test_acc1_ema=test_stats_ema['acc1'], head="perf", step=epoch)
-                log_stats.update({**{f'test_{k}_ema': v for k, v in test_stats_ema.items()}})
+                    log_writer.update(
+                        test_acc1_ema=test_stats_ema['acc1'], head="perf", step=epoch)
+                log_stats.update(
+                    {**{f'test_{k}_ema': v for k, v in test_stats_ema.items()}})
         else:
             log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                          'epoch': epoch,
@@ -464,13 +494,14 @@ def main(args):
     if wandb_logger and args.wandb_ckpt and args.save_ckpt and args.output_dir:
         wandb_logger.log_checkpoints()
 
-
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
 
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('ConvNeXt training and evaluation script', parents=[get_args_parser()])
+    parser = argparse.ArgumentParser(
+        'ConvNeXt training and evaluation script', parents=[get_args_parser()])
     args = parser.parse_args()
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
