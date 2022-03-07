@@ -160,7 +160,8 @@ class ConvNeXt(nn.Module):
         super().__init__()
 
         if bitstring is not None:
-            bitstring = [int(b) for b in bitstring]
+            # remove any space chars
+            bitstring = [int(b) for b in bitstring.replace(' ', '')]
 
         # stem and 3 intermediate downsampling conv layers
         self.downsample_layers = nn.ModuleList()
