@@ -44,7 +44,7 @@ def run():
         '--output_dir', f'exp_data/caltech_{BITSTRINGS[idx]}',
         '--data_set', 'CALTECH',
         '--num_workers', str(0),
-        '--bitstring', BITSTRINGS[idx]
+        '--bitstring', BITSTRINGS[idx],
     ]
     subprocess.call(call_str)
 
