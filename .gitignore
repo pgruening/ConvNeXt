@@ -1,5 +1,5 @@
 data/caltech101/101_ObjectCategories/*/*.jpg
-exp_data/*
+exp_data/**/*.pth
 .vscode/launch.json
 **/*.pyc
 data/caltech101/101_ObjectCategories.tar.gz
