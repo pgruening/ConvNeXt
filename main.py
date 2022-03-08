@@ -213,6 +213,11 @@ def get_args_parser():
 def main(args):
     utils.init_distributed_mode(args)
     print(args)
+    with open(os.path.join(args.output_dir, 'opt.json'), 'w') as file:
+        json.dump(args.__dict__, file)
+        print(
+            f'Wrote opt file to: {os.path.join(args.output_dir, "opt.json")}'
+        )
     device = torch.device(args.device)
 
     # fix the seed for reproducibility
