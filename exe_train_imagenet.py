@@ -9,16 +9,19 @@ os.environ["NCCL_SOCKET_IFNAME"] = 'lo'
 call_str = [
     'python',
     '-m', 'torch.distributed.launch',
-    '--nproc_per_node=3', 'main.py',
+    '--nproc_per_node=8', 'main.py',
     '--model', 'convnext_tiny',
     '--batch_size', str(256),
     '--lr', str(4e-3),
-    '--update_freq', str(4),
+    '--update_freq', str(2),
     '--model_ema', 'true',
     '--model_ema_eval', 'true',
     '--data_path', '/data/ILSVRC/Data/CLS-LOC',
-    '--output_dir', 'exp_data/convnext_baseline',
-    '--data_set', 'CALTECH',
-    '--num_workers', str(2),
+    '--output_dir', '/data/exp_data/imagenet/convnext_baseline',
+    '--log_dir', '/data/tb_log'
+    '--data_set', 'IMNET',
+    '--seed', str(0),
+    '--num_workers', str(10),
+    '--drop_path', str(0.1),
 ]
 subprocess.call(call_str)
