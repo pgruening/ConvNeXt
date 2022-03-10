@@ -18,7 +18,7 @@ call_str = [
     '--model_ema_eval', 'true',
     '--data_path', '/data/ILSVRC/Data/CLS-LOC',
     '--output_dir', '/data/exp_data/imagenet/convnext_baseline',
-    '--log_dir', '/data/tb_log'
+    '--log_dir', '/data/tb_log',
     '--data_set', 'IMNET',
     '--seed', str(0),
     '--num_workers', str(10),
