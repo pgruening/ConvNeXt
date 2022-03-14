@@ -3,13 +3,22 @@ import os
 import argparse
 
 BITSTRINGS = [
-    '100 111 111100000 000',  # 85.34 0
+    '100 111 111100000 000',  # 85.34 0 -> 81.35
     '101 111 011100000 000',  # 84.86 1
     '101 110 111000000 000',  # 84.35 2
     '000 110 010100000 000',  # 83.81 3
-    '000 110 001100000 000',  # 83.56 4
+    '000 110 001100000 000',  # 83.56 4 -> 81.79
     '100 110 011000010 000',  # 83.42 5
-    '100 100 100000000 000',  # ?? 7
+    '100 100 100000000 000',  # ??    6 ->
+    # Naive Bayes
+    '000 100 001000000 000',  # 7 ->
+    '000 100 000000000 000',  # 8
+    '000 110 001000000 000',  # 9
+    '000 110 000000000 000',  # 10
+    # Naive Bayes: handpicked
+    '100 110 001000000 000',
+    # Regression: handpicked
+    '001 100 100000000 000',
 ]
 
 
@@ -47,10 +56,13 @@ def run():
         '--num_workers', str(10),
         '--drop_path', str(0.1),
         '--bitstring', BITSTRINGS[idx],
-        #'--auto_resume', 'true'
+        '--auto_resume', 'true'
     ]
     print(call_str)
-    subprocess.call(call_str)
+    try:
+        subprocess.call(call_str)
+    except:
+        subprocess.call(call_str)
 
 
 if __name__ == '__main__':
