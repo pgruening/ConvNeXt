@@ -32,7 +32,8 @@ def run():
         '--num_workers', str(10),
         '--drop_path', str(0.1),
         '--bitstring', bitstring,
-        '--auto_resume', 'true'
+        '--auto_resume', 'true',
+        '--use_fuzzy', 'true',
     ]
     print(call_str)
     subprocess.call(call_str)
