@@ -48,6 +48,7 @@ class FuzzyNextMinBlock(nn.Module):
 
         self.norm1 = LayerNorm(dim, eps=1e-6)
         self.norm2 = LayerNorm(dim, eps=1e-6)
+
         # pointwise/1x1 convs, implemented with linear layers
         self.pwconv1 = nn.Linear(dim, 4 * dim)
         self.act = nn.GELU()
@@ -67,10 +68,13 @@ class FuzzyNextMinBlock(nn.Module):
         x_right = self.dwconv_right(x)
 
         x_conv = self.norm1(x_left)
+        x_conv = x_conv.permute(0, 2, 3, 1)
 
         x_left = self.instance_norm_relu(x_left)
         x_right = self.instance_norm_relu(x_right)
         x_min = self.min(x_left, x_right)
+
+        x_min = x_min.permute(0, 2, 3, 1)
         x_min = self.norm2(x_min)
 
         if self.training:
@@ -79,8 +83,7 @@ class FuzzyNextMinBlock(nn.Module):
             lbda = self.lbda
         x = lbda * x_conv + (1. - lbda) * x_min
 
-        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
+        # (N, C, H, W) -> (N, H, W, C)
         x = self.pwconv1(x)
         x = self.act(x)
         x = self.pwconv2(x)
