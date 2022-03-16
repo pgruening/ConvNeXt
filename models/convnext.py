@@ -64,15 +64,15 @@ class FuzzyNextMinBlock(nn.Module):
 
     def forward(self, x):
         input = x
-        x_left = self.dwconv_left(x)
+        x_conv = self.dwconv_left(x)
         x_right = self.dwconv_right(x)
 
-        x_conv = self.norm1(x_left)
-        x_conv = x_conv.permute(0, 2, 3, 1)
-
-        x_left = self.instance_norm_relu(x_left)
+        x_left = self.instance_norm_relu(x_conv)
         x_right = self.instance_norm_relu(x_right)
         x_min = self.min(x_left, x_right)
+
+        x_conv = x_conv.permute(0, 2, 3, 1)
+        x_conv = self.norm1(x_conv)
 
         x_min = x_min.permute(0, 2, 3, 1)
         x_min = self.norm2(x_min)
