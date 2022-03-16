@@ -18,6 +18,80 @@ from timm.models.layers import DropPath, trunc_normal_
 from timm.models.registry import register_model
 
 
+class FuzzyNextMinBlock(nn.Module):
+    r""" ConvNeXt Block. There are two equivalent implementations:
+    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
+    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
+    We use (2) as we find it slightly faster in PyTorch
+
+    Args:
+        dim (int): Number of input channels.
+        kernel_size (int): dws kernel_size
+        drop_path (float): Stochastic depth rate. Default: 0.0
+        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+    """
+
+    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, kernel_size=7):
+        super().__init__()
+        if kernel_size != 7:
+            warnings.warn(f'Using kernel_size: {kernel_size}')
+
+        self.dwconv_left = nn.Conv2d(dim, dim, kernel_size=kernel_size,
+                                     padding=kernel_size // 2, groups=dim)  # depthwise conv
+        self.dwconv_right = nn.Conv2d(dim, dim, kernel_size=kernel_size,
+                                      padding=kernel_size // 2, groups=dim)
+        self.instance_norm_relu = nn.Sequential(
+            nn.InstanceNorm2d(dim),
+            nn.ReLU()
+        )
+        self.min = Minimum()
+
+        self.norm1 = LayerNorm(dim, eps=1e-6)
+        self.norm2 = LayerNorm(dim, eps=1e-6)
+        # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv1 = nn.Linear(dim, 4 * dim)
+        self.act = nn.GELU()
+        self.pwconv2 = nn.Linear(4 * dim, dim)
+        self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((dim)),
+                                  requires_grad=True) if layer_scale_init_value > 0 else None
+        self.drop_path = DropPath(
+            drop_path) if drop_path > 0. else nn.Identity()
+
+        self.lbda = nn.Parameter(torch.tensor(
+            [.5], requires_grad=False
+        ).float())
+
+    def forward(self, x):
+        input = x
+        x_left = self.dwconv_left(x)
+        x_right = self.dwconv_right(x)
+
+        x_conv = self.norm1(x_left)
+
+        x_left = self.instance_norm_relu(x_left)
+        x_right = self.instance_norm_relu(x_right)
+        x_min = self.min(x_left, x_right)
+        x_min = self.norm2(x_min)
+
+        if self.training:
+            lbda = (torch.rand(1) >= .5).float().to(self.lbda.device)
+        else:
+            lbda = self.lbda
+        x = lbda * x_conv + (1. - lbda) * x_min
+
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
+        x = self.norm(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
+
+        x = input + self.drop_path(x)
+        return x
+
+
 class NextMinBlock(nn.Module):
     r""" ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
@@ -155,7 +229,7 @@ class ConvNeXt(nn.Module):
                  layer_scale_init_value=1e-6, head_init_scale=1.,
                  strides=[4, 2, 2, 2], downsample_padding=False,
                  kernel_size=7,
-                 bitstring=None
+                 bitstring=None, use_fuzzy=False
                  ):
         super().__init__()
 
@@ -192,7 +266,7 @@ class ConvNeXt(nn.Module):
         cur = 0
         for i in range(4):
             stage = nn.Sequential(
-                *[self._get_block(cur + j, bitstring)(
+                *[self._get_block(cur + j, bitstring, use_fuzzy)(
                     dim=dims[i], drop_path=dp_rates[cur + j],
                     layer_scale_init_value=layer_scale_init_value,
                     kernel_size=kernel_size
@@ -208,9 +282,14 @@ class ConvNeXt(nn.Module):
         self.head.weight.data.mul_(head_init_scale)
         self.head.bias.data.mul_(head_init_scale)
 
-    def _get_block(self, index, bitstring):
+    def _get_block(self, index, bitstring, use_fuzzy):
         if bitstring is None:
             return Block
+
+        if use_fuzzy:
+            print(f"Using fuzzy block: {index}")
+            return FuzzyNextMinBlock if bitstring[index] == 1 else Block
+
         return NextMinBlock if bitstring[index] == 1 else Block
 
     def _init_weights(self, m):

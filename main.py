@@ -67,6 +67,7 @@ def get_args_parser():
     parser.add_argument('--layer_scale_init_value', default=1e-6, type=float,
                         help="Layer scale initial values")
     parser.add_argument('--bitstring', type=str, default=None)
+    parser.add_argument('--use_fuzzy', type=str2bool, default=False)
 
     # EMA related parameters
     parser.add_argument('--model_ema', type=str2bool, default=False)
@@ -298,7 +299,8 @@ def main(args):
         drop_path_rate=args.drop_path,
         layer_scale_init_value=args.layer_scale_init_value,
         head_init_scale=args.head_init_scale,
-        bitstring=args.bitstring
+        bitstring=args.bitstring,
+        use_fuzzy=args.use_fuzzy
     )
 
     if args.finetune:
