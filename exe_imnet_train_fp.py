@@ -1,7 +1,7 @@
 import subprocess
 import os
 import argparse
-
+import time
 BITSTRINGS = [
     '100 111 111100000 000',  # 85.34 0 -> 81.35
     '101 111 011100000 000',  # 84.86 1
@@ -25,6 +25,7 @@ BITSTRINGS = [
 def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument('--index', type=int, default=0)
+    parser.add_argument('--no_dp', action='store_true')
     return parser.parse_args()
 
 
@@ -37,6 +38,11 @@ def run():
     os.environ["NCCL_SOCKET_IFNAME"] = 'lo'
 
     folder_name = BITSTRINGS[idx].replace(' ', '_')
+
+    drop_p = 0.1
+    if options.no_dp:
+        drop_p = 0.
+        folder_name += '_no_dp'
 
     call_str = [
         'python',
@@ -54,16 +60,16 @@ def run():
         '--data_set', 'IMNET',
         '--seed', str(0),
         '--num_workers', str(10),
-        '--drop_path', str(0.1),
+        '--drop_path', str(drop_p),
         '--bitstring', BITSTRINGS[idx],
         '--auto_resume', 'true'
     ]
     print(call_str)
-    try:
-        subprocess.call(call_str)
-    except:
-        subprocess.call(call_str)
-
+    if True: #while True:
+        try:
+            subprocess.call(call_str)
+        except:
+            time.sleep(120)
 
 if __name__ == '__main__':
     run()

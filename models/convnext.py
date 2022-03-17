@@ -58,9 +58,10 @@ class FuzzyNextMinBlock(nn.Module):
         self.drop_path = DropPath(
             drop_path) if drop_path > 0. else nn.Identity()
 
-        self.lbda = nn.Parameter(torch.tensor(
-            [.5], requires_grad=False
-        ).float())
+        self.lbda = .5
+        #self.lbda = nn.Parameter(torch.tensor(
+        #    [.5], requires_grad=False
+        #).float())
 
     def forward(self, x):
         input = x
@@ -78,9 +79,10 @@ class FuzzyNextMinBlock(nn.Module):
         x_min = self.norm2(x_min)
 
         if self.training:
-            lbda = (torch.rand(1) >= .5).float().to(self.lbda.device)
+            lbda = (torch.rand(1) >= .5).float().to(x.device)
         else:
-            lbda = self.lbda
+            lbda = torch.tensor([self.lbda]).float().to(x.device)
+
         x = lbda * x_conv + (1. - lbda) * x_min
 
         # (N, C, H, W) -> (N, H, W, C)
