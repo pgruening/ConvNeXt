@@ -26,6 +26,7 @@ def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument('--index', type=int, default=0)
     parser.add_argument('--no_dp', action='store_true')
+    parser.add_argument('--bitstring', type=str, default=None)
     return parser.parse_args()
 
 
@@ -37,7 +38,13 @@ def run():
     os.environ["NCCL_IB_DISABLE"] = '1'
     os.environ["NCCL_SOCKET_IFNAME"] = 'lo'
 
-    folder_name = BITSTRINGS[idx].replace(' ', '_')
+    if options.bitstring is not None:
+        assert idx == -1
+        bitstring = options.bitstring
+    else:
+        bitstring = BITSTRINGS[idx]
+
+    folder_name = bitstring.replace(' ', '_')
 
     drop_p = 0.1
     if options.no_dp:
@@ -61,15 +68,13 @@ def run():
         '--seed', str(0),
         '--num_workers', str(10),
         '--drop_path', str(drop_p),
-        '--bitstring', BITSTRINGS[idx],
+        '--bitstring', bitstring,
         '--auto_resume', 'true'
     ]
+
     print(call_str)
-    if True: #while True:
-        try:
-            subprocess.call(call_str)
-        except:
-            time.sleep(120)
+    subprocess.call(call_str)
+
 
 if __name__ == '__main__':
     run()
