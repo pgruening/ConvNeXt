@@ -25,6 +25,7 @@ BITSTRINGS = [
 def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument('--index', type=int, default=0)
+    parser.add_argument('--bs', type=int, default=256)
     parser.add_argument('--no_dp', action='store_true')
     parser.add_argument('--bitstring', type=str, default=None)
     return parser.parse_args()
@@ -46,6 +47,9 @@ def run():
 
     folder_name = bitstring.replace(' ', '_')
 
+    if options.bs != 256:
+        folder_name += f"_bs{options.bs}"
+
     drop_p = 0.1
     if options.no_dp:
         drop_p = 0.
@@ -56,7 +60,7 @@ def run():
         '-m', 'torch.distributed.launch',
         '--nproc_per_node=8', 'main.py',
         '--model', 'convnext_tiny',
-        '--batch_size', str(256),
+        '--batch_size', str(options.bs),
         '--lr', str(4e-3),
         '--update_freq', str(2),
         '--model_ema', 'true',
