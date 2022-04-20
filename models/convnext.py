@@ -166,6 +166,8 @@ class NextMinMinusLambdaBlock(NextMinBlock):
             kernel_size=kernel_size
         )
         self.lambda_ = 2.
+        self.drop_path = nn.Identity()
+        print('NO DROPPATH USED')
 
     def forward(self, x):
         input = x
