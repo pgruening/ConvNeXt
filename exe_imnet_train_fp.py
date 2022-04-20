@@ -19,7 +19,10 @@ BITSTRINGS = [
     '100 110 001000000 000',  # 11 ->
     # Regression: handpicked
     '001 100 100000000 000',  # 12 -> best so far
+    '111 111 111000000 000',  # 13 -> with alternate block
 ]
+
+# '101 100 100000000 000'
 
 
 def get_options():
@@ -28,6 +31,7 @@ def get_options():
     parser.add_argument('--bs', type=int, default=256)
     parser.add_argument('--no_dp', action='store_true')
     parser.add_argument('--bitstring', type=str, default=None)
+    parser.add_argument('--alternate_block', type=str, default=None)
     return parser.parse_args()
 
 
@@ -55,6 +59,9 @@ def run():
         drop_p = 0.
         folder_name += '_no_dp'
 
+    if options.alternate_block is not None:
+        folder_name += '_ab_' + options.alternate_block
+
     call_str = [
         'python',
         '-m', 'torch.distributed.launch',
@@ -73,8 +80,10 @@ def run():
         '--num_workers', str(10),
         '--drop_path', str(drop_p),
         '--bitstring', bitstring,
-        '--auto_resume', 'true'
+        '--auto_resume', 'true',
     ]
+    if options.alternate_block:
+        call_str += ['--alternate_block', options.alternate_block]
 
     print(call_str)
     subprocess.call(call_str)

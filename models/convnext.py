@@ -58,10 +58,10 @@ class FuzzyNextMinBlock(nn.Module):
         self.drop_path = DropPath(
             drop_path) if drop_path > 0. else nn.Identity()
 
-        self.lbda = .5
-        #self.lbda = nn.Parameter(torch.tensor(
-        #    [.5], requires_grad=False
-        #).float())
+        #self.lbda = .5
+        self.lbda = nn.Parameter(torch.tensor(
+            [.5], requires_grad=False
+        ).float())
 
     def forward(self, x):
         input = x
@@ -79,11 +79,11 @@ class FuzzyNextMinBlock(nn.Module):
         x_min = self.norm2(x_min)
 
         if self.training:
-            lbda = (torch.rand(1) >= .5).float().to(x.device)
+            lbda = (torch.rand(1) >= .5).float().to(x.device) + 0. * self.lbda
         else:
-            lbda = torch.tensor([self.lbda]).float().to(x.device)
+            lbda = self.lbda
 
-        x = lbda * x_conv + (1. - lbda) * x_min
+        x = lbda * x_min + (1. - lbda) * x_conv
 
         # (N, C, H, W) -> (N, H, W, C)
         x = self.pwconv1(x)
@@ -144,6 +144,38 @@ class NextMinBlock(nn.Module):
         x_right = self.instance_norm_relu(x_right)
 
         x = self.min(x_left, x_right)
+
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
+        x = self.norm(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
+
+        x = input + self.drop_path(x)
+        return x
+
+
+class NextMinMinusLambdaBlock(NextMinBlock):
+    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, kernel_size=7):
+        super().__init__(
+            dim, drop_path=drop_path,
+            layer_scale_init_value=layer_scale_init_value,
+            kernel_size=kernel_size
+        )
+        self.lambda_ = 2.
+
+    def forward(self, x):
+        input = x
+        x_left = self.dwconv_left(x)
+        x_right = self.dwconv_right(x)
+
+        x_left = self.instance_norm_relu(x_left)
+        x_right = self.instance_norm_relu(x_right)
+
+        x = self.lambda_ * self.min(x_left, x_right) - x_left
 
         x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
         x = self.norm(x)
@@ -234,7 +266,7 @@ class ConvNeXt(nn.Module):
                  layer_scale_init_value=1e-6, head_init_scale=1.,
                  strides=[4, 2, 2, 2], downsample_padding=False,
                  kernel_size=7,
-                 bitstring=None, use_fuzzy=False
+                 bitstring=None, alternate_block=None
                  ):
         super().__init__()
 
@@ -271,7 +303,7 @@ class ConvNeXt(nn.Module):
         cur = 0
         for i in range(4):
             stage = nn.Sequential(
-                *[self._get_block(cur + j, bitstring, use_fuzzy)(
+                *[self._get_block(cur + j, bitstring, alternate_block)(
                     dim=dims[i], drop_path=dp_rates[cur + j],
                     layer_scale_init_value=layer_scale_init_value,
                     kernel_size=kernel_size
@@ -287,13 +319,17 @@ class ConvNeXt(nn.Module):
         self.head.weight.data.mul_(head_init_scale)
         self.head.bias.data.mul_(head_init_scale)
 
-    def _get_block(self, index, bitstring, use_fuzzy):
+    def _get_block(self, index, bitstring, alternate_block):
         if bitstring is None:
             return Block
 
-        if use_fuzzy:
-            print(f"Using fuzzy block: {index}")
-            return FuzzyNextMinBlock if bitstring[index] == 1 else Block
+        if alternate_block is not None:
+            new_block = {
+                'fuzzy': FuzzyNextMinBlock,
+                'minuslambda': NextMinMinusLambdaBlock,
+            }[alternate_block]
+            print(f"{index} – Using alternate-block: {alternate_block}")
+            return new_block if bitstring[index] == 1 else Block
 
         return NextMinBlock if bitstring[index] == 1 else Block
 

@@ -68,6 +68,7 @@ def get_args_parser():
                         help="Layer scale initial values")
     parser.add_argument('--bitstring', type=str, default=None)
     parser.add_argument('--use_fuzzy', type=str2bool, default=False)
+    parser.add_argument('--alternate_block', type=str, default=None)
 
     # EMA related parameters
     parser.add_argument('--model_ema', type=str2bool, default=False)
@@ -300,7 +301,8 @@ def main(args):
         layer_scale_init_value=args.layer_scale_init_value,
         head_init_scale=args.head_init_scale,
         bitstring=args.bitstring,
-        use_fuzzy=args.use_fuzzy
+        use_fuzzy=args.use_fuzzy,
+        alternate_block=args.alternate_block
     )
 
     if args.finetune:
