@@ -33,6 +33,8 @@ def get_options():
     parser.add_argument('--no_dp', action='store_true')
     parser.add_argument('--bitstring', type=str, default=None)
     parser.add_argument('--alternate_block', type=str, default=None)
+    parser.add_argument('--post_fix', type=str, default=None)
+
     return parser.parse_args()
 
 
@@ -62,6 +64,9 @@ def run():
 
     if options.alternate_block is not None:
         folder_name += '_ab_' + options.alternate_block
+
+    if options.post_fix is not None:
+        folder_name += options.post_fix
 
     call_str = [
         'python',
