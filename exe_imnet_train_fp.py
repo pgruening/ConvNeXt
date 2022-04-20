@@ -19,7 +19,7 @@ BITSTRINGS = [
     '100 110 001000000 000',  # 11 ->
     # Regression: handpicked
     '001 100 100000000 000',  # 12 -> best so far
-    '111 111 111000000 000',  # 13 -> with alternate block
+    '111 111 111000000 000',  # 13 -> with alternate block: minuslambda
 ]
 
 # '101 100 100000000 000'
@@ -29,6 +29,7 @@ def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument('--index', type=int, default=0)
     parser.add_argument('--bs', type=int, default=256)
+    parser.add_argument('--update_freq', type=int, default=2)
     parser.add_argument('--no_dp', action='store_true')
     parser.add_argument('--bitstring', type=str, default=None)
     parser.add_argument('--alternate_block', type=str, default=None)
@@ -69,7 +70,7 @@ def run():
         '--model', 'convnext_tiny',
         '--batch_size', str(options.bs),
         '--lr', str(4e-3),
-        '--update_freq', str(2),
+        '--update_freq', str(options.update_freq),
         '--model_ema', 'true',
         '--model_ema_eval', 'true',
         '--data_path', '/data/ILSVRC/Data/CLS-LOC',
