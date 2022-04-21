@@ -166,8 +166,6 @@ class NextMinMinusLambdaBlock(NextMinBlock):
             kernel_size=kernel_size
         )
         self.lambda_ = 2.
-        self.drop_path = nn.Identity()
-        print('NO DROPPATH USED')
 
     def forward(self, x):
         input = x
@@ -190,6 +188,19 @@ class NextMinMinusLambdaBlock(NextMinBlock):
 
         x = input + self.drop_path(x)
         return x
+
+
+class NextMinMinusLambdaBlockBN(NextMinMinusLambdaBlock):
+    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, kernel_size=7):
+        super().__init__(
+            dim, drop_path=drop_path,
+            layer_scale_init_value=layer_scale_init_value,
+            kernel_size=kernel_size
+        )
+        self.instance_norm_relu = nn.Sequential(
+            nn.BatchNorm2d(dim),
+            nn.ReLU()
+        )
 
 
 class Minimum(nn.Module):
@@ -329,6 +340,7 @@ class ConvNeXt(nn.Module):
             new_block = {
                 'fuzzy': FuzzyNextMinBlock,
                 'minuslambda': NextMinMinusLambdaBlock,
+                'minuslambdaBN': NextMinMinusLambdaBlockBN
             }[alternate_block]
             print(f"{index} – Using alternate-block: {alternate_block}")
             return new_block if bitstring[index] == 1 else Block
