@@ -20,6 +20,7 @@ BITSTRINGS = [
     # Regression: handpicked
     '001 100 100000000 000',  # 12 -> best so far
     '111 111 111000000 000',  # 13 -> with alternate block: minuslambda
+    '111 111 000000000 000',  # 14 -> with alternate block: minuslambda
 ]
 
 # '101 100 100000000 000'
