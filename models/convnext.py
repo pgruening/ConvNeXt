@@ -190,6 +190,45 @@ class NextMinMinusLambdaBlock(NextMinBlock):
         return x
 
 
+class NextMinMinusAbsBlockNoNorm(NextMinBlock):
+    def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, kernel_size=7):
+        super().__init__(
+            dim, drop_path=drop_path,
+            layer_scale_init_value=layer_scale_init_value,
+            kernel_size=kernel_size
+        )
+        self.lambda_ = 2.
+        self.abs = Abs()
+        self.instance_norm_relu = nn.Sequential(
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        input = x
+        x_left = self.dwconv_left(x)
+        x_right = self.dwconv_right(x)
+
+        x_left = self.instance_norm_relu(x_left)
+        x_right = self.instance_norm_relu(x_right)
+
+        x = (
+            self.lambda_ * self.min(x_left, x_right) -
+            self.abs(x_left - x_right)
+        )
+
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
+        x = self.norm(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
+
+        x = input + self.drop_path(x)
+        return x
+
+
 class NextMinMinusLambdaBlockBN(NextMinMinusLambdaBlock):
     def __init__(self, dim, drop_path=0., layer_scale_init_value=1e-6, kernel_size=7):
         super().__init__(
@@ -219,6 +258,11 @@ class Minimum(nn.Module):
     def forward(self, x, y):
         # Computes the element-wise minimum of x and y
         return torch.minimum(x, y)
+
+
+class Abs(nn.Module):
+    def forward(self, x):
+        return torch.abs(x)
 
 
 class Block(nn.Module):
@@ -354,6 +398,7 @@ class ConvNeXt(nn.Module):
                 'minuslambda': NextMinMinusLambdaBlock,
                 'minuslambdaBN': NextMinMinusLambdaBlockBN,
                 'minuslambdaNoNorm': NextMinMinusLambdaBlockNoNorm,
+                'minusAbsNoNorm': NextMinMinusAbsBlockNoNorm,
             }[alternate_block]
             print(f"{index} – Using alternate-block: {alternate_block}")
             return new_block if bitstring[index] == 1 else Block
